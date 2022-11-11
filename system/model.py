@@ -4,7 +4,7 @@ import numpy as np
 
 from dataclasses import dataclass
 
-dT = 0.00001
+dT = 0.0001
 
 L = 5 / 1000  # vad ska det vara här? Läste 28 mH nånstans
 B = 0.1  # 0 friktion beroende på varvtal
@@ -12,7 +12,7 @@ k_lambda = 0.2
 R = 0.5
 
 g = 9.82
-m = 100
+m = 20
 utväxlingskonstant = 9
 verkningsgrad = 0.3
 J = 0.00024  # moment konstant för motorn + system???
@@ -80,11 +80,11 @@ def simulate(seconds: int, target_current: int) -> SimulationResult:
                 T_last[i] = T_dev[i]
             else:
                 if T_dev[i] > T_last_max:
-                    T_last[i] = T_dev[i] - T_last_max
+                    T_last[i] = T_last_max
                 else:
-                    T_last = T_dev[i] - T_last_min
+                    T_last[i] = T_last_min
 
-        T_last[i] = T_last[i] / utväxlingskonstant
+        T_last[i] = T_last[i]# / utväxlingskonstant
 
         dOmega = (T_dev[i] - T_last[i]) / J
 
@@ -109,17 +109,17 @@ def simulate(seconds: int, target_current: int) -> SimulationResult:
         }
     )
 
+screw_outer_dia = 0.024
+screw_inner_dia = 0.019
+pitch = 0.005  # m/revulution
+
+friction_coef_static = 0.15
+friction_coef_dynamic = 0.10
+
+no_load_friction_torque_static = 0.03
+no_load_friction_torque_dynamic = 0.02
 
 def screw_torque_with__dynamic_friction(w, F):  # [Tmax,T,Tmin]
-    screw_outer_dia = 0.025
-    screw_inner_dia = 0.020
-    pitch = 0.01  # m/revulution
-    friction_coef_static = 0.15
-    friction_coef_dynamic = 0.10
-    no_load_friction_torque_static = 0.03
-    no_load_friction_torque_dynamic = 0.02
-
-    w_min_dynamic = 1  # rad/s speeds below this is considered standstill, shold be set to the maximum change during a simulation step.
 
     pitch_rad = pitch / 2 / np.pi  # mm/rad
     T_no_friction = F * pitch_rad
@@ -133,15 +133,6 @@ def screw_torque_with__dynamic_friction(w, F):  # [Tmax,T,Tmin]
 
 def screw_torque_with_static_friction(F):  # [Tmax,T,Tmin]
 
-    screw_outer_dia = 0.025
-    screw_inner_dia = 0.020
-    friction_coef_static = 0.15
-    friction_coef_dynamic = 0.10
-
-    no_load_friction_torque_static = 0.03
-    no_load_friction_torque_dynamic = 0.02
-
-    pitch = 0.01  # m/revulution
     R_eff = (screw_outer_dia + screw_inner_dia) / 4  # screw effective radius
 
     pitch_rad = pitch / 2 / np.pi  # mm/rad
