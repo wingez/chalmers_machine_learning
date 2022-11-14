@@ -90,7 +90,8 @@ def simulate(seconds: int, target_current: int) -> SimulationResult:
 
         omega[i] = omega[i - 1] + dT * dOmega
 
-        dpos = omega[i] / 1800
+        omega_rps = omega[i] / 2/np.pi
+        dpos = omega_rps / 1800
         pos[i] = pos[i - 1] + dT * dpos
 
     t = np.linspace(0, N * dT, N)
