@@ -4,20 +4,24 @@ import numpy as np
 
 from dataclasses import dataclass
 
+# Simulation step in seconds
 dT = 0.0001
 
+# System konstants
 L = 5 / 1000  # vad ska det vara här? Läste 28 mH nånstans
 B = 0.1  # 0 friktion beroende på varvtal
-k_lambda = 0.2
+k_lambda = 0.03
 R = 0.5
 
 g = 9.82
-m = 20
 utväxlingskonstant = 9
-verkningsgrad = 0.3
 J = 0.00024  # moment konstant för motorn + system???
 
+Kp = 1
+Ki = 0.0001
 
+
+# The data which is returned from the simulation which we can use to make graphs
 @dataclass
 class SimulationResult:
     current: np.ndarray
@@ -31,41 +35,65 @@ class SimulationResult:
 
     voltages: Dict[str, np.ndarray]
 
+    error : np.ndarray
+    error_accumulated : np.ndarray
 
-def simulate(seconds: int, target_current: int) -> SimulationResult:
+
+def simulate(seconds: int, max_current: int, target_omega: int, m: int) -> SimulationResult:
+    # Antal simuleringssteg
     N = int(seconds / dT)
 
     # Tillståndsvariabler
     I = np.zeros(N)
     omega = np.zeros(N)
+
+    # Positionen är integralen av omega (med lite utväxlingskonstanter)
     pos = np.zeros(N)
 
+    # Spänningen till systemet
     V = np.zeros(N)
 
+    # Spänningen över de olika komponenterna i motorn
     vL = np.zeros(N)
     vR = np.zeros(N)
     vEa = np.zeros(N)
 
+    # Vridmoment ut från motorn
     T_dev = np.zeros(N)
+    # Vridmoment från last. Omvänd riktining
     T_last = np.zeros(N)
 
-    for i in range(1, N):
-        V[i] = 24 if I[i - 1] < target_current else 0
+    # Errors från PI-regulatorn
+    Error = np.zeros(N)
+    ErrorAccumulated = np.zeros(N)
 
+    # Loopa varje simuleringssteg
+    for i in range(1, N):
+
+        # Enkel PI regulator
+        last_omega = omega[i - 1]
+        Error[i] = target_omega - last_omega
+        ErrorAccumulated[i] = ErrorAccumulated[i - 1] + Error[i] * dT
+
+        targetVoltage = Kp * Error[i] + Ki * ErrorAccumulated[i]
+
+        # clamp 0-24V
+        targetVoltage = max(0, min(24, targetVoltage))
+
+        # clamp current So that it dont exceed max-current. Requirement from LArs in mail
+        V[i] = targetVoltage if I[i - 1] < max_current else 0
+
+        # Beräkna spänningarna över de olika delarna i motorn
         vR[i] = R * I[i - 1]
         vEa[i] = k_lambda * omega[i - 1]
         vL[i] = V[i] - vR[i] - vEa[i]
 
-        dI = (V[i] - R * I[i - 1] - k_lambda * omega[i - 1]) / L
 
-        I[i] = I[i - 1] + dT * dI
-
-        applied_force = m * (g + 0)
-        # T_last_max, T_last_min = screw_torque_with_friction(omega[i - 1], applied_force)
-
-        # T_last_min, T_last_max = T_last_min / utväxlingskonstant, T_last_max / utväxlingskonstant
-
+        # Beräkna vridmomentet från motorn
         T_dev[i] = k_lambda * I[i - 1]
+
+        # Beräkna t_last. Dvs motverkande vridmoment från lasten
+        applied_force = m * (g + 0)
 
         is_dynamic = abs(omega[i - 1]) > 1
         if is_dynamic:
@@ -84,13 +112,20 @@ def simulate(seconds: int, target_current: int) -> SimulationResult:
                 else:
                     T_last[i] = T_last_min
 
-        T_last[i] = T_last[i]# / utväxlingskonstant
+        T_last[i] = T_last[i] / utväxlingskonstant
 
+        # Beräkna strömderivatan
+        dI = (V[i] - R * I[i - 1] - k_lambda * omega[i - 1]) / L
+        # Integrera strömmen för nästa spännigssteg
+        I[i] = I[i - 1] + dT * dI
+
+        # Beräkna omega-derivatan
         dOmega = (T_dev[i] - T_last[i]) / J
-
+        # Integrera omega för nästa spännigssteg
         omega[i] = omega[i - 1] + dT * dOmega
 
-        omega_rps = omega[i] / 2/np.pi
+        # Positionen är omega integrerat
+        omega_rps = omega[i] / 2 / np.pi
         dpos = omega_rps / 1800
         pos[i] = pos[i - 1] + dT * dpos
 
@@ -107,8 +142,13 @@ def simulate(seconds: int, target_current: int) -> SimulationResult:
             "V_R": vR,
             "V_Ea": vEa,
             "v_Supply": V,
-        }
+        },
+        error=Error,
+        error_accumulated=ErrorAccumulated,
     )
+
+
+# I dont really know what this does. This is all Lars's code
 
 screw_outer_dia = 0.024
 screw_inner_dia = 0.019
@@ -119,6 +159,7 @@ friction_coef_dynamic = 0.10
 
 no_load_friction_torque_static = 0.03
 no_load_friction_torque_dynamic = 0.02
+
 
 def screw_torque_with__dynamic_friction(w, F):  # [Tmax,T,Tmin]
 
