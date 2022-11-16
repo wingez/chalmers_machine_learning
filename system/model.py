@@ -28,7 +28,7 @@ R = 0.5
 g = 9.82
 transmission_reduction = 9
 
-rps_to_ms = pitch / transmission_reduction
+rads_to_ms = pitch / transmission_reduction / 2 / np.pi
 
 J = 0.00024  # moment konstant för motorn + system???
 
@@ -98,7 +98,7 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
 
             # Enkel PI regulator
             target_velocity = target_function(current_time)
-            target_omega = target_velocity/rps_to_ms * 2 * np.pi
+            target_omega = target_velocity/rads_to_ms
 
             last_omega = omega[i - 1]
             Error[i] = target_omega - last_omega
@@ -155,8 +155,7 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
         omega[i] = omega[i - 1] + dT * dOmega
 
         # Positionen är omega integrerat
-        omega_rps = omega[i] / 2 / np.pi
-        dpos = omega_rps * rps_to_ms
+        dpos = omega[i] * rads_to_ms
         pos[i] = pos[i - 1] + dT * dpos
 
     t = np.linspace(0, N * dT, N)
