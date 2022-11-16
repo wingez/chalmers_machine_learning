@@ -7,6 +7,18 @@ from dataclasses import dataclass
 # Simulation step in seconds
 dT = 0.0001
 
+# Trapezoidal screw mechanical properties
+
+screw_outer_dia = 0.024
+screw_inner_dia = 0.019
+pitch = 0.005  # m/revulution
+
+friction_coef_static = 0.15
+friction_coef_dynamic = 0.10
+
+no_load_friction_torque_static = 0.03
+no_load_friction_torque_dynamic = 0.02
+
 # System konstants
 L = 5 / 1000  # vad ska det vara här? Läste 28 mH nånstans
 B = 0.1  # 0 friktion beroende på varvtal
@@ -14,7 +26,10 @@ k_lambda = 0.03
 R = 0.5
 
 g = 9.82
-utväxlingskonstant = 9
+transmission_reduction = 9
+
+rps_to_ms = pitch / transmission_reduction
+
 J = 0.00024  # moment konstant för motorn + system???
 
 Kp = 1
@@ -82,7 +97,9 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
         elif voltage_selector == REGULATOR:
 
             # Enkel PI regulator
-            target_omega = target_function(current_time)
+            target_velocity = target_function(current_time)
+            target_omega = target_velocity/rps_to_ms * 2 * np.pi
+
             last_omega = omega[i - 1]
             Error[i] = target_omega - last_omega
             ErrorAccumulated[i] = ErrorAccumulated[i - 1] + Error[i] * dT
@@ -125,7 +142,7 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
                 else:
                     T_last[i] = T_last_min
 
-        T_last[i] = T_last[i] / utväxlingskonstant
+        T_last[i] = T_last[i] / transmission_reduction
 
         # Beräkna strömderivatan
         dI = (V[i] - R * I[i - 1] - k_lambda * omega[i - 1]) / L
@@ -139,7 +156,7 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
 
         # Positionen är omega integrerat
         omega_rps = omega[i] / 2 / np.pi
-        dpos = omega_rps / 1800
+        dpos = omega_rps * rps_to_ms
         pos[i] = pos[i - 1] + dT * dpos
 
     t = np.linspace(0, N * dT, N)
@@ -162,18 +179,6 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
 
 
 # I dont really know what this does. This is all Lars's code
-
-screw_outer_dia = 0.024
-screw_inner_dia = 0.019
-pitch = 0.005  # m/revulution
-
-friction_coef_static = 0.15
-friction_coef_dynamic = 0.10
-
-no_load_friction_torque_static = 0.03
-no_load_friction_torque_dynamic = 0.02
-
-
 def screw_torque_with__dynamic_friction(w, F):  # [Tmax,T,Tmin]
 
     pitch_rad = pitch / 2 / np.pi  # mm/rad
