@@ -46,6 +46,9 @@ class SimulationResult:
     omega: np.ndarray
     pos: np.ndarray
 
+    vel: np.ndarray
+    acc: np.ndarray
+
     time: np.ndarray
 
     t_dev: np.ndarray
@@ -68,6 +71,9 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
 
     # Positionen är integralen av omega (med lite utväxlingskonstanter)
     pos = np.zeros(N)
+    vel = np.zeros(N)
+    acc = np.zeros(N)
+
 
     # Spänningen till systemet
     V = np.zeros(N)
@@ -155,8 +161,11 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
         omega[i] = omega[i - 1] + dT * dOmega
 
         # Positionen är omega integrerat
-        dpos = omega[i] * rads_to_ms
-        pos[i] = pos[i - 1] + dT * dpos
+        vel[i] = omega[i] * rads_to_ms
+        pos[i] = pos[i - 1] + dT * vel[i]
+
+        # vel och acc är proportionellt mot omega respektive dOmega
+        acc[i] = dOmega * rads_to_ms
 
     t = np.linspace(0, N * dT, N)
     return SimulationResult(
@@ -166,6 +175,8 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
         t_dev=T_dev,
         t_last=T_last,
         pos=pos,
+        vel=vel,
+        acc=acc,
         voltages={
             "V_L": vL,
             "V_R": vR,
