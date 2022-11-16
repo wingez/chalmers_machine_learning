@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Callable
 
 import numpy as np
 
@@ -20,6 +20,9 @@ J = 0.00024  # moment konstant för motorn + system???
 Kp = 1
 Ki = 0.0001
 
+REGULATOR = "regulator"
+DIRECT_VOLTAGE = "voltage"
+
 
 # The data which is returned from the simulation which we can use to make graphs
 @dataclass
@@ -35,11 +38,12 @@ class SimulationResult:
 
     voltages: Dict[str, np.ndarray]
 
-    error : np.ndarray
-    error_accumulated : np.ndarray
+    error: np.ndarray
+    error_accumulated: np.ndarray
 
 
-def simulate(seconds: int, max_current: int, target_omega: int, m: int) -> SimulationResult:
+def simulate(seconds: float, max_current: float, m: float, voltage_selector: str,
+             target_function: Callable[[float], float]) -> SimulationResult:
     # Antal simuleringssteg
     N = int(seconds / dT)
 
@@ -70,15 +74,25 @@ def simulate(seconds: int, max_current: int, target_omega: int, m: int) -> Simul
     # Loopa varje simuleringssteg
     for i in range(1, N):
 
-        # Enkel PI regulator
-        last_omega = omega[i - 1]
-        Error[i] = target_omega - last_omega
-        ErrorAccumulated[i] = ErrorAccumulated[i - 1] + Error[i] * dT
+        current_time = i * dT
 
-        targetVoltage = Kp * Error[i] + Ki * ErrorAccumulated[i]
+        # Select how we should calculate the voltage to the motor
+        if voltage_selector == DIRECT_VOLTAGE:
+            targetVoltage = target_function(current_time)
+        elif voltage_selector == REGULATOR:
+
+            # Enkel PI regulator
+            target_omega = target_function(current_time)
+            last_omega = omega[i - 1]
+            Error[i] = target_omega - last_omega
+            ErrorAccumulated[i] = ErrorAccumulated[i - 1] + Error[i] * dT
+
+            targetVoltage = Kp * Error[i] + Ki * ErrorAccumulated[i]
+        else:
+            raise NotImplementedError()
 
         # clamp 0-24V
-        targetVoltage = max(0, min(24, targetVoltage))
+        targetVoltage = max(-24, min(24, targetVoltage))
 
         # clamp current So that it dont exceed max-current. Requirement from LArs in mail
         V[i] = targetVoltage if I[i - 1] < max_current else 0
@@ -87,7 +101,6 @@ def simulate(seconds: int, max_current: int, target_omega: int, m: int) -> Simul
         vR[i] = R * I[i - 1]
         vEa[i] = k_lambda * omega[i - 1]
         vL[i] = V[i] - vR[i] - vEa[i]
-
 
         # Beräkna vridmomentet från motorn
         T_dev[i] = k_lambda * I[i - 1]
