@@ -1,6 +1,7 @@
 from typing import Dict, Callable
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from dataclasses import dataclass
 
@@ -186,6 +187,7 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
         pos=pos,
         vel=vel,
         acc=acc,
+        ref=ref,
         voltages={
             "V_L": vL,
             "V_R": vR,
