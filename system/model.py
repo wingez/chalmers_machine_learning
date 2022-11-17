@@ -32,9 +32,11 @@ rads_to_ms = pitch / transmission_reduction / 2 / np.pi
 
 J = 0.00024  # moment konstant för motorn + system???
 
+# Regulalator controller parameters
 Kp = 1
 Ki = 0.0001
 
+# Modes the regulator can operate in
 REGULATOR = "regulator"
 DIRECT_VOLTAGE = "voltage"
 
@@ -50,6 +52,8 @@ class SimulationResult:
     acc: np.ndarray
 
     time: np.ndarray
+
+    ref: np.ndarray
 
     t_dev: np.ndarray
     t_last: np.ndarray
@@ -88,6 +92,9 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
     # Vridmoment från last. Omvänd riktining
     T_last = np.zeros(N)
 
+    # Referens-signal
+    ref = np.zeros(N)
+
     # Errors från PI-regulatorn
     Error = np.zeros(N)
     ErrorAccumulated = np.zeros(N)
@@ -97,13 +104,15 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
 
         current_time = i * dT
 
+        ref[i] = target_function(current_time)
+
         # Select how we should calculate the voltage to the motor
         if voltage_selector == DIRECT_VOLTAGE:
-            targetVoltage = target_function(current_time)
+            targetVoltage = ref[i]
         elif voltage_selector == REGULATOR:
 
             # Enkel PI regulator
-            target_velocity = target_function(current_time)
+            target_velocity = ref[i]
             target_omega = target_velocity/rads_to_ms
 
             last_omega = omega[i - 1]
@@ -114,7 +123,7 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
         else:
             raise NotImplementedError()
 
-        # clamp 0-24V
+        # clamp [-24 +24V]
         targetVoltage = max(-24, min(24, targetVoltage))
 
         # clamp current So that it dont exceed max-current. Requirement from LArs in mail
@@ -189,7 +198,7 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
 
 
 # I dont really know what this does. This is all Lars's code
-def screw_torque_with__dynamic_friction(w, F):  # [Tmax,T,Tmin]
+def screw_torque_with__dynamic_friction(w, F):  # [T]
 
     pitch_rad = pitch / 2 / np.pi  # mm/rad
     T_no_friction = F * pitch_rad
