@@ -5,6 +5,24 @@ import matplotlib.pyplot as plt
 
 from dataclasses import dataclass
 
+## Sensor errors ####################
+import random
+import bisect
+
+# Sannolikhet för fel per rotation
+fault_value = 0.00001
+
+# Set random seed
+random.seed(1)
+
+# Lista för snabb Standard Deviation
+std_list = [1, 0.318, 0.046, 0.004, 0.002, 0]
+
+# Lista för möjliga utfall av felet
+missed_rev_list = [0, 1, 2, 3, 4, 5, 6]
+
+###################################
+
 # Simulation step in seconds
 dT = 0.0001
 
@@ -32,6 +50,13 @@ transmission_reduction = 9
 rads_to_ms = pitch / transmission_reduction / 2 / np.pi
 
 J = 0.00024  # moment konstant för motorn + system???
+
+########################
+# Konstant för spänningsfiltrering
+# (Blir multiplicerad med tidssteget)
+filter_step = 20
+
+##################
 
 # Regulalator controller parameters
 Kp = 1
@@ -79,6 +104,11 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
     vel = np.zeros(N)
     acc = np.zeros(N)
 
+    # Genomsnittsspänning för extrauppgift ##
+
+    v_filt = np.zeros(N)
+
+    ######
 
     # Spänningen till systemet
     V = np.zeros(N)
@@ -107,6 +137,13 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
 
         ref[i] = target_function(current_time)
 
+        # Sensorfel
+        # Fel gällande avlästa varv
+        if random.random() <= fault_value * omega[i - 1]:
+            rev_fault = omega_sensorfault(omega[i - 1])
+        else:
+            rev_fault = 0
+
         # Select how we should calculate the voltage to the motor
         if voltage_selector == DIRECT_VOLTAGE:
             targetVoltage = ref[i]
@@ -114,9 +151,9 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
 
             # Enkel PI regulator
             target_velocity = ref[i]
-            target_omega = target_velocity/rads_to_ms
+            target_omega = target_velocity / rads_to_ms
 
-            last_omega = omega[i - 1]
+            last_omega = omega[i - 1] - rev_fault
             Error[i] = target_omega - last_omega
             ErrorAccumulated[i] = ErrorAccumulated[i - 1] + Error[i] * dT
 
@@ -127,6 +164,11 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
         # clamp [-24 +24V]
         targetVoltage = max(-24, min(24, targetVoltage))
 
+        # Current sensor: ACS723LLCTR-10AB-T with sensitivity of +/- 1.5%
+        # lägga till mätbrus 15mA, mätosäkerhet 1.5%
+        last_current = I[i - 1]
+        sensor_noise = (0.015 * last_current) + 0.015
+        I[i - 1] = last_current + rand.uniform(-sensor_noise, sensor_noise)
         # clamp current So that it dont exceed max-current. Requirement from LArs in mail
         V[i] = targetVoltage if I[i - 1] < max_current else 0
 
@@ -177,6 +219,9 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
         # vel och acc är proportionellt mot omega respektive dOmega
         acc[i] = dOmega * rads_to_ms
 
+        # Beräkna genomsnittsspänning
+        v_filt[i] = v_filt[i - 1] * (1 - dT / (filter_step * dT)) + V[i] * dT / (filter_step * dT)
+
     t = np.linspace(0, N * dT, N)
     return SimulationResult(
         current=I,
@@ -193,6 +238,7 @@ def simulate(seconds: float, max_current: float, m: float, voltage_selector: str
             "V_R": vR,
             "V_Ea": vEa,
             "v_Supply": V,
+            "v_filt": v_filt,
         },
         error=Error,
         error_accumulated=ErrorAccumulated,
@@ -224,3 +270,20 @@ def screw_torque_with_static_friction(F):  # [Tmax,T,Tmin]
     Tmin = T_no_friction - (abs(F) * R_eff * friction_coef_static + no_load_friction_torque_static)
 
     return Tmax, Tmin
+
+
+def omega_sensorfault(w):
+    # Fel har inträffat, beräkna hur "allvarligt" felet är enligt standard deviation
+    # Denna funktion ger ett index
+    fault_index = bisect.bisect_right(std_list, random.random())
+    # Av rimlighetsskäl så bör antalet fellästa varv inte bli fler än
+    # antalet faktiska varv. Därför görs följande if else.
+    if w >= 6:
+        rev_fault = missed_rev_list[fault_index] * (random.randint(0, 1) * 2 - 1)
+    else:
+        if fault_index > int(w):
+            fault_index = int(w)
+
+        rev_fault = range(int(w))[fault_index] * (random.randint(0, 1) * 2 - 1)
+
+    return rev_fault
