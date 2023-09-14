@@ -10,7 +10,7 @@ flows_river_b = np.array(
      1.79, 1.56])
 
 river_a_distrib = np.random.normal(6.5, 2.5, 4000)
-river_b_distrib = np.random.normal(1.5, 4.5, 4000) + 4
+river_b_distrib = np.random.normal(4.5, 4.5, 4000)
 
 river_a_distrib = river_a_distrib[river_a_distrib >= 2.5]
 river_b_distrib = river_b_distrib[river_b_distrib >= 1.5]
@@ -57,6 +57,7 @@ print(f"River A total flow: {river_a_distrib.sum():.2f}", )
 print(f"River B total flow:{river_b_distrib.sum():.2f} ", )
 
 plt.show()
+
 
 turbine_efficiency_francis = np.array(
     [0.00, 0.01, 0.20, 0.36, 0.49, 0.60, 0.68, 0.75, 0.80, 0.83, 0.86, 0.87, 0.88, 0.89, 0.89, 0.89, 0.89, 0.89, 0.88,
