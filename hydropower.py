@@ -12,8 +12,8 @@ flows_river_b = np.array(
 river_a_distrib = np.random.normal(6.5, 2.5, 4000)
 river_b_distrib = np.random.normal(1.5, 4.5, 4000) + 4
 
-river_a_distrib = river_a_distrib[river_a_distrib >= 0]
-river_b_distrib = river_b_distrib[river_b_distrib >= 0]
+river_a_distrib = river_a_distrib[river_a_distrib >= 2.5]
+river_b_distrib = river_b_distrib[river_b_distrib >= 1.5]
 
 both_rivers = np.concatenate([river_a_distrib, river_b_distrib])
 flows_y_axis = np.linspace(both_rivers.min(), both_rivers.max(), 1000)
