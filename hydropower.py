@@ -53,11 +53,15 @@ ax2.set(xlabel='percentage time of flow equal or exceed', ylabel='flow (m3/s)',
 
 ax2.legend()
 
-print(f"River A total yearly flow: {river_a_distrib.sum()/river_a_distrib.size * (3600*24*365):.2f} m3", )
-print(f"River B total yearly flow: {river_b_distrib.sum()/river_b_distrib.size * (3600*24*365):.2f} m3", )
+river_a_avg_flow = river_a_distrib.sum() / river_a_distrib.size
+river_b_avg_flow = river_b_distrib.sum() / river_b_distrib.size
+
+print(f"River A total yearly flow: {river_a_avg_flow * (3600 * 24 * 365):.2f} m3", )
+print(f"River A avg flow: {river_a_avg_flow:.2f} m3/s")
+print(f"River B total yearly flow: {river_b_avg_flow * (3600 * 24 * 365):.2f} m3", )
+print(f"River B avg flow: {river_b_avg_flow:.2f} m3/s")
 
 plt.show()
-
 
 turbine_efficiency_francis = np.array(
     [0.00, 0.01, 0.20, 0.36, 0.49, 0.60, 0.68, 0.75, 0.80, 0.83, 0.86, 0.87, 0.88, 0.89, 0.89, 0.89, 0.89, 0.89, 0.88,
@@ -137,7 +141,7 @@ river_a_power_distrib = np.linspace(0, river_a_power.max(), 1000)
 river_a_power_percentages = sum_flows(river_a_power, river_a_power_distrib)
 
 fig, ax = plt.subplots()
-ax.plot(river_a_power_percentages * 100, river_a_power_distrib / 1e6, label="B distrib")
+ax.plot(river_a_power_percentages * 100, river_a_power_distrib / 1e6, label="A distrib")
 
 ax.set(ylabel='Power (MW)', xlabel='% of time equal or exceeds',
        title='Power duration distribution')
@@ -150,5 +154,49 @@ power_average = np.average(river_a_power) * e_t
 energy_per_year_WH = power_average * 24 * 365
 print(f"Yearly power production: {energy_per_year_WH / 1e6:.2f} MWh")
 
-CF = energy_per_year_WH /(24*365 * max_power)
+CF = energy_per_year_WH / (24 * 365 * max_power)
 print(f"capacity factor: {CF:.2f}")
+
+temp = np.sort(river_a_distrib)
+temp_flipped = np.flip(temp.copy())
+dam_inflow = np.concatenate([temp, temp_flipped, temp, temp_flipped])
+dam_content = np.zeros(dam_inflow.size)
+dam_outflow = np.zeros(dam_inflow.size)
+
+for i in range(1, dam_inflow.size):
+    fill = dam_content[i - 1] + dam_inflow[i]
+    if fill >= designed_flow:
+        out_flow = designed_flow
+        fill -= out_flow
+    else:
+        out_flow = fill
+        fill = 0
+
+    dam_content[i] = fill
+    dam_outflow[i] = out_flow
+
+# Create some mock data
+date_values = np.linspace(0, dam_inflow.size, dam_inflow.size)
+
+fig, ax1 = plt.subplots()
+
+color = 'tab:red'
+ax1.set_xlabel('time (s)')
+ax1.set_ylabel('flow (m3/s)', color=color)
+ax1.plot(date_values, dam_inflow, label="inflow")
+ax1.plot(date_values, dam_outflow, label="outflow")
+ax1.tick_params(axis='y', labelcolor=color)
+ax1.set(title=f"River Dammed with maximum output flow = {designed_flow} m3/s")
+
+ax1.legend()
+
+ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+
+color = 'tab:green'
+ax2.set_ylabel('dam fill (m3)', color=color)  # we already handled the x-label with ax1
+ax2.plot(date_values, dam_content, color=color)
+ax2.tick_params(axis='y', labelcolor=color)
+
+fig.tight_layout()  # otherwise the right y-label is slightly clipped
+
+plt.show()
