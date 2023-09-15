@@ -53,8 +53,8 @@ ax2.set(xlabel='percentage time of flow equal or exceed', ylabel='flow (m3/s)',
 
 ax2.legend()
 
-print(f"River A total flow: {river_a_distrib.sum():.2f}", )
-print(f"River B total flow:{river_b_distrib.sum():.2f} ", )
+print(f"River A total yearly flow: {river_a_distrib.sum()/river_a_distrib.size * (3600*24*365):.2f} m3", )
+print(f"River B total yearly flow: {river_b_distrib.sum()/river_b_distrib.size * (3600*24*365):.2f} m3", )
 
 plt.show()
 
