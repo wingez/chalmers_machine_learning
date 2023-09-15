@@ -200,3 +200,34 @@ ax2.tick_params(axis='y', labelcolor=color)
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
 
 plt.show()
+
+
+
+
+river_a_power_dammed = power(dam_outflow)
+river_a_power_dammed_distrib = np.linspace(0, river_a_power_dammed.max(), 1000)
+river_a_power_dammed_percentages = sum_flows(river_a_power_dammed, river_a_power_dammed_distrib)
+
+fig, ax = plt.subplots()
+ax.plot(river_a_power_dammed_percentages * 100, river_a_power_dammed_distrib / 1e6, label="With DAM")
+ax.plot(river_a_power_percentages * 100, river_a_power_distrib / 1e6, label="Without DAM")
+
+ax.set(ylabel='Power (MW)', xlabel='% of time equal or exceeds',
+       title='Power duration distribution DAMM')
+
+ax.legend()
+
+plt.show()
+
+power_average_dammed = np.average(river_a_power_dammed) * e_t
+energy_per_year_WH_dammed = power_average_dammed * 24 * 365
+print(f"Yearly power production DAM: {energy_per_year_WH_dammed / 1e6:.2f} MWh")
+
+CF = energy_per_year_WH_dammed / (24 * 365 * max_power)
+print(f"capacity factor DAM: {CF:.2f}")
+
+
+
+
+
+
